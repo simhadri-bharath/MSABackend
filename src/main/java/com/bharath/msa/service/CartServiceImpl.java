@@ -20,6 +20,8 @@ import com.bharath.msa.repository.MedicinesRepository;
 import com.bharath.msa.repository.OrdersRepository;
 import com.bharath.msa.repository.SalesRepository;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
 @Service
 public class CartServiceImpl {
 	
@@ -36,6 +38,9 @@ public class CartServiceImpl {
 	
 	@Autowired
 	private RestTemplate restTemplate;
+	
+	private final String serverUrl = Dotenv.configure().load().get("SERVER_URL");
+
 	
 	
 	 public Cart addToCart(Long customerId, Long medicineId, int quantity) {
@@ -88,7 +93,7 @@ public class CartServiceImpl {
 		        medicine.setQuantity(newQuantity); // Decrease the quantity
 
 		        // Call the updateMedicine endpoint
-		        String url = "http://localhost:8081/medicine/" + medicine.getId();
+		        String url = serverUrl + "/" + medicine.getId();
 		        restTemplate.put(url, medicine);
 
 		        // Create and save order entry
@@ -150,3 +155,4 @@ public class CartServiceImpl {
 
 
 }
+
