@@ -88,7 +88,7 @@ public class CartServiceImpl {
 		        medicine.setQuantity(newQuantity); // Decrease the quantity
 
 		        // Call the updateMedicine endpoint
-		        String url = "http://localhost:8081/medicine/" + medicine.getId();
+		        String url = "https://msabackend-production.up.railway.app/medicine/" + medicine.getId();
 		        restTemplate.put(url, medicine);
 
 		        // Create and save order entry
