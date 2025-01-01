@@ -55,6 +55,25 @@ Ensure you have the following installed:
    http://localhost:8080
    ```
 
+## Environment Variables
+
+To configure the backend application, the following environment variables should be set:
+
+```env
+ALLOWED_ORIGINS="https://your-frontend-domain.com,https://another-frontend.com,http://localhost:3000"
+SERVER_PORT="8080"
+SERVER_URL="https://your-backend-domain.com"
+SPRING_APPLICATION_NAME="medicine-shop"
+SPRING_DATASOURCE_DRIVER="com.mysql.cj.jdbc.Driver"
+SPRING_DATASOURCE_PASSWORD="your-db-password"
+SPRING_DATASOURCE_URL="jdbc:mysql://your-db-host:your-db-port/your-database"
+SPRING_DATASOURCE_USERNAME="your-db-username"
+SPRING_JPA_DDL_AUTO="update"
+SPRING_JPA_DIALECT="org.hibernate.dialect.MySQLDialect"
+```
+
+Replace the placeholder values with your actual environment configurations.
+
 ## API Endpoints
 
 ### Medicines Controller
