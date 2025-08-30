@@ -1,25 +1,20 @@
 package com.bharath.msa.controller;
 
+import com.bharath.msa.config.JwtUtil;
+import com.bharath.msa.entity.Customer;
+import com.bharath.msa.service.CustomerServiceImpl;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.bharath.msa.entity.Customer;
-import com.bharath.msa.service.CustomerServiceImpl;
 
 
 @RestController
@@ -29,12 +24,28 @@ public class customerController {
 	@Autowired
 	CustomerServiceImpl customerServiceImpl;
 
+	@Autowired
+	private PasswordEncoder passwordEncoder;
 	
-		@PostMapping("/customer")
-		public ResponseEntity<Customer> addCustomer(@RequestBody Customer customer) {
-			 return new ResponseEntity<>(customerServiceImpl.addCustomer(customer),HttpStatus.CREATED);
-			 
-		}
+	 @Autowired
+	    private AuthenticationManager authenticationManager;
+
+	    @Autowired
+	    private JwtUtil jwtUtil;
+	
+//		@PostMapping("/customer")
+//		public ResponseEntity<Customer> addCustomer(@RequestBody Customer customer) {
+//			 return new ResponseEntity<>(customerServiceImpl.addCustomer(customer),HttpStatus.CREATED);
+//			 
+//		}
+	
+	    @PostMapping("/customer")
+	    public ResponseEntity<Customer> addCustomer(@RequestBody Customer customer) {
+	        // Encode the password before saving
+	        customer.setPassword(passwordEncoder.encode(customer.getPassword()));
+	        return new ResponseEntity<>(customerServiceImpl.addCustomer(customer), HttpStatus.CREATED);
+	    }
+
 		
 		 @GetMapping("/customer")
 		    public List<Customer> getAllCustomers() {
@@ -54,9 +65,17 @@ public class customerController {
 		    }
 		    @PutMapping("/customer/{id}")
 		    public ResponseEntity<Customer> updateCustomer(@PathVariable Long id, @RequestBody Customer customerDetails) {
+		        if (customerDetails.getPassword() != null && !customerDetails.getPassword().isEmpty()) {
+		            customerDetails.setPassword(passwordEncoder.encode(customerDetails.getPassword()));
+		        }
 		        Customer updatedCustomer = customerServiceImpl.updateCustomer(id, customerDetails);
 		        return new ResponseEntity<>(updatedCustomer, HttpStatus.OK);
 		    }
+//		    @PutMapping("/customer/{id}")
+//		    public ResponseEntity<Customer> updateCustomer(@PathVariable Long id, @RequestBody Customer customerDetails) {
+//		        Customer updatedCustomer = customerServiceImpl.updateCustomer(id, customerDetails);
+//		        return new ResponseEntity<>(updatedCustomer, HttpStatus.OK);
+//		    }
 		    
 //		    @PostMapping("/customer/verify")
 //		    public ResponseEntity<String> verifyCustomer(@RequestParam String email, @RequestParam String password) {
@@ -83,6 +102,41 @@ public class customerController {
 		        return ResponseEntity.ok(response);
 		    }
 
+		    @PostMapping("/customer/login")
+		    public ResponseEntity<Map<String, Object>> login(@RequestParam String email, @RequestParam String password) {
+		        Map<String, Object> response = new HashMap<>();
+		        try {
+		            // Authenticate the user
+		            authenticationManager.authenticate(
+		                new UsernamePasswordAuthenticationToken(email, password)
+		            );
+
+		            // Fetch customer details from DB
+		            Customer customer = customerServiceImpl.findByEmail(email);
+		            if (customer != null) {
+		                customer.setPassword(null); // Do not expose password
+		            }
+
+		            // Generate JWT token
+		            String token = jwtUtil.generateToken(
+		                    org.springframework.security.core.userdetails.User.builder()
+		                            .username(email)
+		                            .password(password)
+		                            .roles("USER")
+		                            .build()
+		            );
+
+		            response.put("success", true);
+		            response.put("token", token);
+		            response.put("customer", customer);
+
+		            return ResponseEntity.ok(response);
+		        } catch (Exception e) {
+		            response.put("success", false);
+		            response.put("message", "Invalid email or password");
+		            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+		        }
+		    }
 
 //		    @PostMapping("/customer/{customerId}/orders")
 //		    public ResponseEntity<Order> createOrder(@PathVariable Long customerId, @RequestBody Order order) {

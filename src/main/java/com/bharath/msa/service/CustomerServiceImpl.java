@@ -64,6 +64,11 @@ public class CustomerServiceImpl {
         return customerRepository.findByEmailAndPassword(email, password);
     }
 
+	public Customer findByEmail(String email) {
+		// TODO Auto-generated method stub
+		return customerRepository.findByEmail(email).orElse(null);
+	}
+
 
 
 

@@ -2,8 +2,11 @@ package com.bharath.msa.service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -72,48 +75,56 @@ public class CartServiceImpl {
 //	    }
 	 
 	 
-	 public List<Orders> checkout(Long customerId) {
-		    List<Cart> cartItems = cartRepository.findByCustomerId(customerId);
-		    List<Orders> orders = new ArrayList<>();
 
-		    for (Cart cartItem : cartItems) {
-		        // Retrieve the medicine and update its quantity
-		        Medicines medicine = cartItem.getMedicine();
-		        Double newQuantity = medicine.getQuantity() - cartItem.getQuantity();
+@Transactional
+public List<Orders> checkout(Long customerId) {
+    // Fetch all cart items for this customer
+    List<Cart> cartItems = cartRepository.findByCustomerId(customerId);
+    if (cartItems.isEmpty()) {
+        return Collections.emptyList();
+    }
 
-		        if (newQuantity < 0) {
-		            throw new RuntimeException("Insufficient quantity for medicine: " + medicine.getTradeName());
-		        }
+    List<Orders> orders = new ArrayList<>();
 
-		        medicine.setQuantity(newQuantity); // Decrease the quantity
+    for (Cart cartItem : cartItems) {
 
-		        // Call the updateMedicine endpoint
-		        String url = "https://msabackend-production.up.railway.app/medicine/" + medicine.getId();
-		        restTemplate.put(url, medicine);
+        // Always re-read the medicine from DB to get the latest quantity
+        Medicines medicine = medicinesRepository.findById(cartItem.getMedicine().getId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Medicine not found: " + cartItem.getMedicine().getId()));
 
-		        // Create and save order entry
-		        Orders order = new Orders();
-		        order.setCustomer(cartItem.getCustomer());
-		        order.setMedicine(medicine);
-		        order.setQuantity(cartItem.getQuantity());
-		        order.setOrderDate(LocalDate.now());
-		        orders.add(ordersRepository.save(order));
+        Double newQuantity = medicine.getQuantity() - cartItem.getQuantity();
+        if (newQuantity < 0) {
+            throw new IllegalStateException(
+                    "Insufficient quantity for medicine: " + medicine.getTradeName());
+        }
 
-		        // Create and save sales entry
-		        Sales sale = new Sales();
-		        sale.setMedicine(medicine);
-		        sale.setQuantitySold(cartItem.getQuantity());
-		        sale.setSaleDate(new Date());
-		        sale.calculateTotalAmount();
-		        salesRepository.save(sale);
-		    }
+        // Update and persist the medicine quantity
+        medicine.setQuantity(newQuantity);
+        medicinesRepository.save(medicine);
 
-		    // Clear cart after processing
-		    cartRepository.deleteAll(cartItems);  
-		    return orders;
-		}
-	 
-	 
+        // Create and persist the order
+        Orders order = new Orders();
+        order.setCustomer(cartItem.getCustomer());
+        order.setMedicine(medicine);
+        order.setQuantity(cartItem.getQuantity());
+        order.setOrderDate(LocalDate.now());
+        orders.add(ordersRepository.save(order));
+
+        // Create and persist the sale
+        Sales sale = new Sales();
+        sale.setMedicine(medicine);
+        sale.setQuantitySold(cartItem.getQuantity());
+        sale.setSaleDate(new Date());
+        sale.calculateTotalAmount(); // if this uses medicine/unit price internally
+        salesRepository.save(sale);
+    }
+
+    // Clear the cart
+    cartRepository.deleteAll(cartItems);
+
+    return orders;
+}
 
 	    public Cart updateQuantity(Long customerId, Long medicineId, int quantity) {
 	        Cart cartItem = cartRepository.findByCustomerIdAndMedicineId(customerId, medicineId)
